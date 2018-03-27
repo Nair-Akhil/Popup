@@ -109,6 +109,7 @@ void setup() {
   oscP5 = new OscP5(this, 12000);
   myRemoteLocation = new NetAddress("127.0.0.1", 12000);
 
+  frame.setLocation(100,100);
   
   XML input;
   input = loadXML("Entries1.xml");
@@ -133,7 +134,7 @@ void setup() {
   noStroke();
   
   jitter = loadShader("jitterFRAG.glsl");
-  jitter.set("s",frameCount);
+  jitter.set("s",frameCount+0.6f);
   
 }
 
@@ -149,8 +150,7 @@ void draw() {
   
   effect();
   
-  //jitter.set("s",frameCount);
-  filter(jitter);
+  
   background(0);
 
   
@@ -203,10 +203,13 @@ void draw() {
   offscreen.popMatrix();
   //offscreen.ellipse(surfaceMouse.x,surfaceMouse.y,75,75);
   offscreen.endDraw();
-  tint(random(255),random(255),random(255));
+  //tint(random(255),random(255),random(255));
   
   surface1.render(offscreen);
   }
+  
+  jitter.set("s",frameCount+0.6f);
+  filter(jitter);
   
 }
 
