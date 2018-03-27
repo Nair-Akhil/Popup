@@ -1,10 +1,11 @@
+
+import deadpixel.keystone.*;
+
 import netP5.*;
 import oscP5.*;
 
 
 /*
-Dialogue class:
-
 the dialogue class creates a popup and takes the following parameters where
 n=the title of the popup
 d=the description text to be displayed in the popup
@@ -13,8 +14,8 @@ o=the origin point of the popup(the popup top bar is drawn 20 pixels above the o
 dim= the dimensions of the popup(the text area doesnt scale with this yet)
 
 Dialogue(n,d,im,o,dim);
-
 */
+
 
 
 StringList wordWrap(String s, int maxWidth) {
@@ -51,28 +52,63 @@ StringList wordWrap(String s, int maxWidth) {
   return a;
 }
 
-/*
-String n;
-String d;
-StringList desc;
-String im;
-PImage i;
-PVector o;
-*/
+
+//KEYSTONE STUFF
+Keystone ks;
+CornerPinSurface surface1;
+
+PGraphics offscreen;
+
 int textH;
 
-Dialogue[] p;
+ArrayList<Dialogue> p;
 
 OscP5 oscP5;
 NetAddress myRemoteLocation;
 
+PImage fish;
+PShader jitter;
+
+int state = 0;
+
+void effect(){
+  
+  switch(state){
+    
+    case 0:
+    
+      if(random(100)>90){
+        
+        state = 1;
+        
+      }
+      
+      break;
+    
+    case 1:
+      
+      tint(random(255),random(255),random(255));
+      
+      break;
+    
+  }
+  
+}
+
 void setup() {
 
+  size(1920,1080,P3D);
+  surface.setResizable(true);
+  fish = loadImage("fish.png");
+  fish.resize(100,50);
+  //keystone stuff
+  ks = new Keystone(this);
+  surface1 = ks.createCornerPinSurface(400,300,20);
+  offscreen = createGraphics(400,300,P3D);
   
-  size(1000, 1000);
+  oscP5 = new OscP5(this, 12000);
+  myRemoteLocation = new NetAddress("127.0.0.1", 12000);
 
-  oscP5 = new OscP5(this,12000);
-  myRemoteLocation = new NetAddress("127.0.0.1",12000);
   
   XML input;
   input = loadXML("Entries1.xml");
@@ -80,246 +116,247 @@ void setup() {
 
 
   XML[] children = input.getChildren("post");
-  p = new Dialogue[children.length];
-  
-  for(int i=0; i<children.length;i++){
-   
+  p = new ArrayList<Dialogue>();
+
+  for (int i=0; i<children.length; i++) {
+
+
     int id = children[i].getInt("id");
     String t = children[i].getString("title");
-    String im = children[i].getContent("image");
+    String im = children[i].getString("image");
     String d = children[i].getContent();
-    PVector o = new PVector(100,100);
-    PVector dim = new PVector(300,400);
-    p[i] = new Dialogue(t,d,im,o,dim);
+    PVector o = new PVector(150, 800);
+    PVector dim = new PVector(550, 860);
+    p.add( new Dialogue(t, d, im, o, dim));
   }
 
   noStroke();
+  
+  jitter = loadShader("jitterFRAG.glsl");
+  jitter.set("s",frameCount);
+  
 }
 
+
+Boolean newMessage = false;
+Boolean postBool = false;
 int postIndex = -1;
-int pPostIndex = -1;
+boolean waiting = false;
+int r;
 
 
 void draw() {
-
+  
+  effect();
+  
+  //jitter.set("s",frameCount);
+  filter(jitter);
   background(0);
+
   
-  if(!(postIndex==pPostIndex)){
-    
-    if(pPostIndex!=-1){
-     
-      p[pPostIndex].close();
+  if (newMessage) {
+
+    if (postIndex!=-1) {
       
-    }
-    if(postIndex!=-1){
-     
-      p[postIndex].open();
-      
-    }
-    
-    postIndex = pPostIndex;
-    
-    
-  }
-  
-  for(int i=0; i<p.length;i++){
-   
-    p[i].mainLoop();
-  }
-  
-  
-}
+      if (postBool) {
 
-void oscEvent(OscMessage theOscMessage){
-  
-  if(theOscMessage.checkAddrPattern("/popup")==true){
-    
-    postIndex = theOscMessage.get(0).intValue();
-    print(postIndex);
-  }
-  
-}
+        if (p.get(postIndex).state==-1) {
 
-void keyPressed(){
-  
-  OscMessage myMessage = new OscMessage("/popup");
-    
-  
-  if(key == '1'){
-   
-    myMessage.add(0);
-    oscP5.send(myMessage,myRemoteLocation);
-   
-  }else if(key == '2'){
-    
-    myMessage.add(1);
-    oscP5.send(myMessage,myRemoteLocation);
-   
-    
-  }else if (key =='3'){
-    
-    myMessage.add(2);
-    oscP5.send(myMessage,myRemoteLocation);
-   
-  
-  }else if (key =='4'){
-   
-    myMessage.add(3);
-    oscP5.send(myMessage,myRemoteLocation);
-    
-  }else if (key == 'm'){
-   
-     
-  }else{
-    myMessage.add(-1);
-    oscP5.send(myMessage,myRemoteLocation);
-    
-  }
-  
-}
-
-class Dialogue {
-
-  int state; //states: 0 = opening 1 = main loop 2 = closing
-
-int shift = 1;
-int indexShift = 0;
-
-  float opacity;
-  float textOpacity;
-  String title;
-
-  StringList desc;
-
-  PImage image;
-
-  PVector origin;
-
-  PVector tDim;
-  PVector cDim;
-
-  
-  PGraphics textbox;
-  PImage text;
-
-  Dialogue(String t, String d, String i, PVector o,PVector dim) {
-
-    title = t;
-    //image = loadImage(i);
-
-    origin = new PVector(o.x, o.y);
-
-    //image.resize(180, 180);
-
-    desc = wordWrap(d, 300);
-
-    desc.append(" ");
-    desc.append(" ");
-    desc.append(" ");
-
-
-    cDim = new PVector(0,0);
-    tDim = dim;
-
-    textH = round(textAscent()*desc.size());
-
-    textbox = createGraphics(round(dim.x-20), round(dim.y-20));
-
-    text = createImage(round(dim.x-20), round((dim.y*0.5f)-20), ARGB);
-    
-    opacity = 0;
-    textOpacity = 0;
-
-    state = -1;
-  }
-
-  void mainLoop() {
-    
-    if(state!=-1){
-    
-    
-     
-      if(state == 0){
-        
-        if(cDim.x<tDim.x&&opacity<255){
-         
-          cDim.x = ceil(lerp(cDim.x,tDim.x,0.1));
-          opacity = ceil(lerp(opacity,255,0.1));
-          
-        }else if(cDim.y<tDim.y){
-          
-          cDim.y = ceil(lerp(cDim.y,tDim.y,0.1));
-          
-        }else if(textOpacity<255){
-         
-          textOpacity = ceil(lerp(textOpacity,255,0.1));
-          
-        }else{
-         
-          state = 1;
+          p.get(postIndex).open();
         }
-        
-      }else if (state == 2){
-       
-        if(textOpacity>0){
-          textOpacity = floor(lerp(textOpacity,0,0.1));
-        }else if(cDim.y>0){
-         
-          cDim.y = floor(lerp(cDim.y,0,0.1));
-        }else if(cDim.x>0&&opacity>0){
-         
-          cDim.x=floor(lerp(cDim.x,0,0.1));
-          opacity = floor(lerp(opacity,0,0.1));
+      } else {
+
+        if (p.get(postIndex).state==1) {
+
+          p.get(postIndex).close();
         }
-        
       }
-     
-    
-    
-    
-    print(opacity);
-    fill(66, 132, 255,opacity);
-    rect(origin.x, origin.y-20, cDim.x, 20, 10, 10, 0, 0);
-    fill(224, 224, 224,opacity);
-    rect(origin.x, origin.y, cDim.x, cDim.y, 0, 0, 10, 10);
+    } else {
 
+      for (int i=0; i<p.size(); i++) {
 
-
-    textbox.beginDraw();
-    textbox.clear();
-    //textbox.text(d, 0, 0, 300, textbox.height);
-    textbox.fill(0,textOpacity);
-   
-    shift = ((frameCount)%12);
-
-    if (shift == 0) {
-
-      indexShift+=1;
+        p.get(i).reset();
+      }
     }
-    for (int i=0; i<380/textAscent(); i++) {
 
-      textbox.text(desc.array()[(i+indexShift)%desc.array().length], 0, i*textAscent()+12-shift);
-    }
-    
-    textbox.endDraw();
-    text.copy(textbox, 0, 0, 280, 380, 0, 0, 280, 380);
+    newMessage = false;
+  }
 
-    //tint(255,textOpacity);
-    //image(image, origin.x+60, origin.y+10);
 
-    fill(0,textOpacity);
-    image(text, origin.x+10, origin.y+200);
-    text(title, origin.x+10, origin.y-5);
-    }
+  for (int i= 0; i<p.size(); i++) {
+
+    p.get(i).mainLoop();
   }
   
-  void open(){
-   
-    state = 0;
+  
+  //keystone
+  if(postIndex==2){
+  offscreen.beginDraw();
+  offscreen.background(0,100,255);
+  offscreen.imageMode(CENTER);
+  offscreen.pushMatrix();
+  
+  offscreen.translate(offscreen.width*0.5+100*sin(frameCount*0.1),offscreen.height*0.5);
+  offscreen.rotateY(PI*0.5*cos(frameCount*0.1)-PI*0.5);
+  
+  offscreen.image(fish,0,0);
+  offscreen.popMatrix();
+  //offscreen.ellipse(surfaceMouse.x,surfaceMouse.y,75,75);
+  offscreen.endDraw();
+  tint(random(255),random(255),random(255));
+  
+  surface1.render(offscreen);
   }
-  void close(){
+  
+}
+
+void oscEvent(OscMessage theOscMessage) {
+  
+  //print(p.size());
+
+  if (theOscMessage.checkAddrPattern("/popup")==true) {
+    
+    
+
+    if(theOscMessage.get(0).intValue()!=-2){
+    postIndex = theOscMessage.get(0).intValue();
+    if (theOscMessage.get(1).intValue()==1) {
+      postBool = true;
+    } else {
+      postBool = false;
+    }
+
+    newMessage = true;
+    }else{
      
-      state = 2;
+      p.add(new Dialogue("DEFAULT ERROR MESSAGE!!!!!!!!!!!!!"));
       
     }
-};
+    
+    
+    print(postIndex);
+    print(" ");
+    print(postBool);
+    print("\n");
+  }
+  
+  
+  
+}
+
+
+
+void keyPressed() {
+
+  OscMessage myMessage = new OscMessage("/popup");
+
+  if (keyCode==UP) {
+
+    for (int i=0; i<p.size(); i++) {
+
+      p.get(i).origin.add(new PVector(0, -1));
+    }
+  }
+  if (keyCode==DOWN) {
+
+    for (int i=0; i<p.size(); i++) {
+
+      p.get(i).origin.add(new PVector(0, 1));
+    }
+  }
+  if (keyCode==LEFT) {
+
+    for (int i=0; i<p.size(); i++) {
+
+      p.get(i).origin.add(new PVector(-1, 0));
+    }
+  }
+  if (keyCode==RIGHT) {
+
+    for (int i=0; i<p.size(); i++) {
+
+      p.get(i).origin.add(new PVector(1, 0));
+    }
+  }
+  if (key == 'i') {
+
+    for (int i=0; i<p.size(); i++) {
+
+      p.get(i).tDim.add(new PVector(1, 0));
+      p.get(i).cDim.add(new PVector(1, 0));
+    }
+  } else if (key == 'o') {
+
+    for (int i=0; i<p.size(); i++) {
+
+      p.get(i).tDim.add(new PVector(0, 1));
+      p.get(i).cDim.add(new PVector(1, 0));
+    }
+  }
+
+
+  if (key == '1') {
+
+    myMessage.add(0);
+    myMessage.add(1);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if (key == '2') {
+
+    myMessage.add(1);
+    myMessage.add(1);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if (key =='3') {
+
+    myMessage.add(2);
+    myMessage.add(1);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if (key =='4') {
+
+    myMessage.add(3);
+    myMessage.add(1);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if (key == 'q') {
+
+    myMessage.add(0);
+    myMessage.add(0);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if (key == 'w') {
+
+    myMessage.add(1);
+    myMessage.add(0);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if (key == 'e') {
+
+    myMessage.add(2);
+    myMessage.add(0);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if (key == 'r') {
+
+    myMessage.add(3);
+    myMessage.add(0);
+    oscP5.send(myMessage, myRemoteLocation);
+  } else if(key == 't') {
+    myMessage.add(-1);
+    myMessage.add(0);
+    oscP5.send(myMessage, myRemoteLocation);
+  }else if(key == 'a'){
+    myMessage.add(-2);
+    myMessage.add("DEFAULT ERROR MESSAGE!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    oscP5.send(myMessage, myRemoteLocation);
+  }
+  
+  
+  if(key=='c'){
+   
+    ks.toggleCalibration();
+    
+  }else if(key =='l'){
+   
+    ks.load();
+    
+  }else if(key =='s'){
+   
+    ks.save();
+    
+  }
+}
