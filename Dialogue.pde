@@ -56,6 +56,7 @@ class Dialogue {
     state = 0;
 
     errorLife = 150;
+   
     
   }
 
@@ -163,8 +164,9 @@ class Dialogue {
 
       textbox.beginDraw();
       textbox.clear();
+      textbox.textFont(mainFont,font);
       //textbox.text(d, 0, 0, 300, textbox.height);
-      textbox.textSize(font);
+      //textbox.textSize(font);
       textbox.fill(0, textOpacity);
 
       if(!error){
