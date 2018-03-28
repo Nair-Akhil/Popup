@@ -128,8 +128,8 @@ void setup() {
     String t = children[i].getString("title");
     String im = children[i].getString("image");
     String d = children[i].getContent();
-    //PVector o = new PVector(150, 800);
-    PVector o = new PVector(50, 50);
+    PVector o = new PVector(150, 800);
+    //PVector o = new PVector(50, 50);
     PVector dim = new PVector(550, 860);
     p.add( new Dialogue(t, d, im, o, dim));
   }
